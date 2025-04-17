@@ -1,0 +1,46 @@
+name: Auto Setup & Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout โค้ด
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. ตั้งค่า Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 3. ติดตั้ง dependencies และ Build
+      - name: Install & Build
+        run: |
+          npm install
+          # สร้างไฟล์ vite.config.js อัตโนมัติหากไม่มี
+          if [ ! -f vite.config.js ]; then
+            echo 'export default { base: "/${GITHUB_REPOSITORY#*/}/" }' > vite.config.js
+          fi
+          npm run build
+
+      # 4. ตั้งค่า GitHub Pages อัตโนมัติ (ใช้ GitHub API)
+      - name: Enable GitHub Pages
+        run: |
+          curl -X POST \
+          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/${{ github.repository }}/pages \
+          -d '{"source":{"branch":"gh-pages","path":"/"}}'
+
+      # 5. Deploy ไปยัง GitHub Pages
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
